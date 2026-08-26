@@ -1,12 +1,146 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
-    <meta charset="UTF-8"/>
-    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title>appdev</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Precios Impresión 3D</title>
+    <!-- Ruta actualizada apuntando a la carpeta src -->
+    <link rel="stylesheet" href="./src/style.css">
 </head>
 <body>
-<div id="app"></div>
-<script src="./src/main.js" type="module"></script>
+
+<div class="container">
+    <!-- Contenedor para Notificaciones (Toasts) -->
+    <div id="toast-container"></div>
+
+    <!-- PANTALLA 1: Bienvenida -->
+    <div id="screen1" class="screen active">
+        <h1>Calculadora de Impresión 3D</h1>
+        <p class="subtitle">Gestiona y calcula los costes y precios de tus proyectos 3D en Argentina.</p>
+        
+        <div class="btn-group">
+            <button class="btn btn-primary" onclick="goToScreen(2)">➕ Ingresar Nuevo Precio</button>
+            <button class="btn btn-outline" onclick="goToScreen(3)">📊 Consultar Precios Ya Establecidos</button>
+        </div>
+    </div>
+
+    <!-- PANTALLA 2: Formulario -->
+    <div id="screen2" class="screen">
+        <h2>Ingresar Valores del Producto</h2>
+        <p class="subtitle">Completa los datos técnicos para calcular los costes reales</p>
+
+        <form id="calcForm" onsubmit="calculatePrice(event)">
+            <div class="form-grid">
+                <div class="form-group full-width">
+                    <label for="nombrePieza">Nombre de la Pieza *</label>
+                    <input type="text" id="nombrePieza" required placeholder="Ej. Soporte para Auriculares">
+                </div>
+                <div class="form-group">
+                    <label for="precioFilamento">Precio del Filamento ($/Kg) *</label>
+                    <input type="number" id="precioFilamento" step="0.01" required placeholder="Ej. 18000">
+                </div>
+                <div class="form-group">
+                    <label for="filamentoUsado">Filamento Usado (Gramos) *</label>
+                    <input type="number" id="filamentoUsado" step="0.1" required placeholder="Ej. 120">
+                </div>
+                <div class="form-group">
+                    <label for="horasImpresion">Tiempo de Impresión (Horas) *</label>
+                    <input type="number" id="horasImpresion" min="0" required placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label for="minutosImpresion">Tiempo de Impresión (Minutos) *</label>
+                    <input type="number" id="minutosImpresion" min="0" max="59" required placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label for="tiempoPostProceso">Post Procesamiento (Minutos)</label>
+                    <input type="number" id="tiempoPostProceso" min="0" value="0">
+                    <span class="help-text">Si se indica cero, es porque no hubo.</span>
+                </div>
+                <div class="form-group">
+                    <label for="tasaFallo">Tasa de Fallo Esperada (%)</label>
+                    <input type="number" id="tasaFallo" min="0" max="100" value="15">
+                    <span class="help-text">Default: 15%.</span>
+                </div>
+                <div class="form-group full-width">
+                    <label for="impresora">Impresora a Utilizar *</label>
+                    <select id="impresora" required>
+                        <option value="Kobra 2 Neo">Anycubic Kobra 2 Neo (~0.12 kWh)</option>
+                        <option value="Kobra 3">Anycubic Kobra 3 (~0.18 kWh)</option>
+                    </select>
+                </div>
+                <div class="form-group full-width">
+                    <label for="elementosAdicionales">Elementos Adicionales ($)</label>
+                    <input type="number" id="elementosAdicionales" min="0" value="0">
+                </div>
+                <div class="form-group full-width">
+                    <label>Foto del Producto *</label>
+                    <div class="file-upload-box" onclick="handleImageUpload()">
+                        <span id="fileUploadLabel">📷 Clic aquí para adjuntar foto de la pieza</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-group row" style="margin-top: 25px;">
+                <button type="button" class="btn btn-secondary" onclick="goToScreen(1)">Volver</button>
+                <button type="submit" class="btn btn-primary">Listo</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- PANTALLA 2.5: Resumen y Resultado -->
+    <div id="screenResult" class="screen">
+        <h2>Resultado del Cálculo</h2>
+        <p class="subtitle">Revisa los precios calculados antes de registrar el producto</p>
+
+        <div class="result-card">
+            <div class="product-img-container">
+                <img id="previewImage" src="" alt="Foto Producto">
+            </div>
+            <div class="price-details">
+                <h3 id="resNombrePieza">Nombre de la pieza</h3>
+                <div class="price-row">
+                    <span class="price-label">Costo Final:</span>
+                    <span class="price-val cost" id="resCostoFinal">$0.00</span>
+                </div>
+                <div class="price-row">
+                    <span class="price-label">Precio Final (x2):</span>
+                    <span class="price-val final" id="resPrecioFinal">$0.00</span>
+                </div>
+                <div class="price-row">
+                    <span class="price-label">Precio x Mayor (x1.75):</span>
+                    <span class="price-val wholesale" id="resPrecioMayor">$0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="btn-group row">
+            <button class="btn btn-secondary" onclick="goToScreen(2)">✏️ Volver a Modificar</button>
+            <button id="btnSave" class="btn btn-primary" onclick="guardarEnSpreadsheet()">
+                <span id="btnSaveText">💾 Guardar Datos</span>
+                <span id="btnSaveSpinner" class="spinner"></span>
+            </button>
+        </div>
+    </div>
+
+    <!-- PANTALLA 3: Redirección / Ver Google Sheet -->
+    <div id="screen3" class="screen">
+        <h2>Productos Cargados</h2>
+        <p class="subtitle">El proceso se completó correctamente</p>
+        <div class="sheets-notice">
+            📌 Puedes abrir el documento de Google Spreadsheet donde están registrados todos los datos.
+        </div>
+        <div class="btn-group">
+            <button onclick="abrirSpreadsheet()" class="btn btn-primary">
+                🔗 Abrir Google Spreadsheet
+            </button>
+            <button class="btn btn-secondary" onclick="goToScreen(1)">
+                🏠 Volver al Inicio
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Ruta actualizada apuntando a la carpeta src -->
+<script src="./src/main.js"></script>
 </body>
 </html>
